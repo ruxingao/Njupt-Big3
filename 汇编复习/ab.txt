@@ -1,0 +1,207 @@
+DATAS SEGMENT
+    NUM DB -19,+28,+37,-46,+55,+61,-74,+255  
+    MESG1 DB 'MAX=$'
+    MESG2 DB 'MIN=$'
+DATAS ENDS
+
+CODES SEGMENT
+    ASSUME CS:CODES,DS:DATAS
+START:
+    MOV AX,DATAS
+    MOV DS,AX
+    MOV SI,OFFSET NUM
+    MOV CX,8
+    MOV DL,0
+    MOV BL,0
+    MOV BH,0
+LAST:
+    CMP BYTE PTR [SI],0
+    JG NEXT
+    INC DL
+    CMP BYTE PTR [SI],BL;最小数
+    JLE MINFIND       
+NEXT:
+    CMP BYTE PTR [SI],BH;最大数
+    JGE MAXFIND
+NEXT1:
+    INC SI
+    LOOP LAST
+    ADD DL,30H;负数个数
+    MOV AH,2
+    INT 21H
+    MOV DL,0AH
+    MOV AH,2
+    INT 21H
+    JMP SHOWMAX
+MINFIND:;令BL中的值为最小值
+    MOV BL,BYTE PTR [SI]
+    JMP NEXT
+MAXFIND:;令BH中的值为最大值
+    MOV BH,BYTE PTR[SI]
+    JMP NEXT1
+SHOWMAX:;输出最大值
+    MOV AH,9
+    MOV DX,OFFSET MESG1
+    INT 21H
+    MOV CX,8
+    MOV CX,8
+LAST1:
+    MOV AL,'0'
+    ROL BX,1
+    JNC NEXT2
+    MOV AL,'1'
+NEXT2:
+    MOV AH,0EH
+    INT 10H
+    LOOP LAST1
+    MOV DL,'B'
+    MOV AH,2
+    INT 21H
+    MOV DL,0AH
+    MOV AH,2
+    INT 21H
+SHOWMIN:;输出最小值
+    MOV AH,9
+    MOV DX,OFFSET MESG2
+    INT 21H
+    MOV CX,8
+LAST2:
+    MOV AL,'0'
+    ROL BX,1
+    JNC NEXT3
+    MOV AL,'1'
+NEXT3:
+    MOV AH,0EH
+    INT 10H
+    LOOP LAST2
+    MOV DL,'B'
+    MOV AH,2
+    INT 21H
+    MOV AH,4CH
+    INT 21H  
+CODES ENDS
+END START
+
+DATA SEGMENT USE16
+
+MESG1 DB 0AH;换行字符
+      DB 'Please enter your username:$'
+LL 	  EQU $-MESG1	
+;LL=当前地址-MES1地址，即字符串长度
+BUF   DB 30
+      DB ?
+      DB 30 DUP(?)
+MESG2 DB 'Please enter your password:$'
+MIMA  DB '123456';密码
+USER  DB 'B19030824';用户名
+BUF1  DB 6 DUP(?)
+BUF2  DB 9 DUP(?)
+MESG3 DB 'Wrong username!$'
+MESG4 DB 'Wrong password!$'
+MESG5 DB 'Welcome!$'
+COUNT DB 3								
+;用户名容错次数
+DATA  ENDS
+CODE  SEGMENT USE16
+      ASSUME  CS:CODE,DS:DATA,ES:DATA	
+;ES附加段存放待显字符    
+BEG:
+      MOV AX,DATA
+      MOV DS,AX
+      MOV ES,AX  						
+      MOV AX,0003H
+      INT 10H
+AGAIN1:
+	 MOV AH,09H
+     MOV DX,OFFSET MESG1;取偏移地址
+     INT 21H	;显示字符串MESG1	
+     MOV AX,1301H
+     MOV BL,01001111B
+     MOV CX,LL							
+     MOV DH,12
+	 MOV DL,(80-LL)/2
+     MOV BX,OFFSET BUF2
+     MOV CX,9;循环次数，即用户名长度
+
+;判断用户名是否错误
+LAST1;
+     MOV AH,01H ;输入字符，并回显
+     INT 21H     
+     MOV [BX],AL ;AL低位传给BX
+     INC BX     ;BX后移一位
+     LOOP LAST1
+     
+     MOV DI,OFFSET BUF2
+     MOV SI,OFFSET USER
+     CLD;将方向标志位DF置0
+     MOV CX,6  ;循环次数，即比较次数
+     REPE CMPSB ;字符串比较，每重复一次CX-1，直到CX=0或ZF=0时为止
+     JZ AGAIN2  ;若相等则跳转，即ZF=1，跳到AGAIN2
+     MOV AH,2
+     MOV DL,0AH  
+     INT 21H	;输出换行字符
+     MOV AH,09H
+     MOV DX,OFFSET MESG;输出字符串WU
+     INT 21H
+     DEC COUNT		;容错次数COUNT-1
+     JZ EXIT		;若COUNT=0，跳到EXIT
+     JMP AGAIN1  ;输入错误，跳转至AGAIN1
+     
+AGAIN2:
+	 MOV AH,2	
+     MOV DL,0AH
+     INT 21H		;输出换行字符
+	 MOV AH,09H
+	 MOV DX,OFFSET MESG2				
+	 INT 21H;输出字符串PASSWORD
+     MOV BX,OFFSET BUF
+     MOV CX,6	;循环次数，即密码长度
+     MOV COUNT,3
+
+;判断密码是否错误
+LAST2:			
+     MOV AH,07H  						
+     INT 21H     ;输入字符，不回显
+     MOV [BX],AL ;AL低位传给BX
+     MOV AH,02H  						
+     MOV DL,'*'
+     INT 21H;输出字符'*'
+     INC BX      ;BX后移一位
+     LOOP LAST2
+     
+     MOV DI,OFFSET BUF1
+     MOV SI,OFFSET MIMA
+     CLD;将方向标志位DF置0
+     MOV CX,6   ;循环次数，即比较次数
+     REPE CMPSB  
+;字符串比较，每重复一次CX-1，直到CX=0或ZF=0时为止
+     JZ RIGHT ;若相等则跳转，即ZF=1，跳到RIGHT
+     MOV AH,2
+     MOV DL,0AH
+     INT 21H;输出换行字符
+     
+     MOV AH,09H
+     MOV DX,OFFSET MESG4
+     INT 21H;输出字符串MESG4
+     DEC COUNT   ;容错次数COUNT-1
+     JZ EXIT;若COUNT=0，跳到EXIT
+     JMP AGAIN2	;输入错误，跳转至AGAIN2
+
+RIGHT:
+	 MOV AH,2
+     MOV DL,0AH
+     INT 21H	;输出换行字符
+     MOV AH,09H
+     MOV DX,OFFSET MESG5
+     INT 21H;输出字符串MESG5
+
+EXIT:
+     MOV AH,4CH
+     INT 21H  	;返回 DOS
+     
+CODE ENDS
+     END BEG
+
+
+
+
